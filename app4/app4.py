@@ -2,20 +2,20 @@ import reflex as rx
 
 # 🧠 Estado global de la app — Aquí guardamos datos y lógica de negocio
 class Estado(rx.State):
-    # Variables que controlan los inputs y el resultado
-    numero1: str = ""
-    numero2: str = ""
-    resultado: float = 0.0
-    historial: list[str] = []
+    # Variables reactivas para los inputs y resultado
+    numero1: rx.Var[str] = rx.var("")
+    numero2: rx.Var[str] = rx.var("")
+    resultado: rx.Var[float] = rx.var(0.0)
+    historial: rx.Var[list[str]] = rx.var([])
 
-    # ⚙️ Función que realiza las operaciones básicas
+    # ⚙️ Método que realiza las operaciones básicas
     def operar(self, operacion: str):
         try:
-            # Convertimos los inputs a float si existen, si no, se toma como 0.0
-            n1 = float(self.numero1) if self.numero1 else 0.0
-            n2 = float(self.numero2) if self.numero2 else 0.0
+            # Convertimos las entradas de texto a float para operar
+            n1 = float(self.numero1.get()) if self.numero1.get() else 0.0
+            n2 = float(self.numero2.get()) if self.numero2.get() else 0.0
 
-            # Procesamos según el tipo de operación
+            # Elegimos operación según la entrada
             if operacion == "suma":
                 res = n1 + n2
                 op = f"{n1} + {n2} = {res}"
@@ -26,6 +26,7 @@ class Estado(rx.State):
                 res = n1 * n2
                 op = f"{n1} * {n2} = {res}"
             elif operacion == "division":
+                # Control de división por cero
                 if n2 == 0:
                     op = "Error: división entre 0"
                     res = 0.0
@@ -36,43 +37,47 @@ class Estado(rx.State):
                 op = "Operación desconocida"
                 res = 0.0
 
-            # Guardamos el resultado y la operación en el historial
-            self.resultado = res
-            self.historial.append(op)
+            # Actualizamos el resultado reactivo
+            self.resultado.set(res)
+
+            # Añadimos la operación realizada al historial, creando una nueva lista para reactividad
+            historial_actual = self.historial.get()
+            self.historial.set(historial_actual + [op])
         except Exception as e:
-            # En caso de error (por ejemplo conversión fallida), lo agregamos al historial
-            self.historial.append(f"Error: {e}")
+            # En caso de error (por ejemplo en la conversión), se añade al historial
+            historial_actual = self.historial.get()
+            self.historial.set(historial_actual + [f"Error: {e}"])
 
-    # 🧹 Función para limpiar los campos y el historial
+    # 🧹 Método para limpiar todos los valores y el historial
     def limpiar(self):
-        self.numero1 = ""
-        self.numero2 = ""
-        self.resultado = 0.0
-        self.historial = []
+        self.numero1.set("")
+        self.numero2.set("")
+        self.resultado.set(0.0)
+        self.historial.set([])
 
-# 📄 Página principal de la app
+# 📄 Definición de la página principal de la app con UI
 def index():
     return rx.center(
         rx.vstack(
             rx.heading("Calculadora Reflex", size="6"),
 
-            # Input para el número 1
+            # Input para el primer número, reactivo con el estado
             rx.input(
                 type_="number",
                 placeholder="Número 1",
                 value=Estado.numero1,
-                on_change=lambda v: Estado.set_numero1(v),
+                on_change=lambda ev: Estado.numero1.set(ev.target.value),
             ),
 
-            # Input para el número 2
+            # Input para el segundo número
             rx.input(
                 type_="number",
                 placeholder="Número 2",
                 value=Estado.numero2,
-                on_change=lambda v: Estado.set_numero2(v),
+                on_change=lambda ev: Estado.numero2.set(ev.target.value),
             ),
 
-            # Botones de operaciones aritméticas
+            # Botones para seleccionar la operación a realizar
             rx.hstack(
                 rx.button("➕", on_click=lambda: Estado.operar("suma")),
                 rx.button("➖", on_click=lambda: Estado.operar("resta")),
@@ -80,24 +85,26 @@ def index():
                 rx.button("➗", on_click=lambda: Estado.operar("division")),
             ),
 
-            # Resultado mostrado
+            # Mostrar el resultado en pantalla
             rx.text("Resultado:", weight="bold", size="4"),
             rx.text(Estado.resultado, color="green", size="5"),
 
-            # Historial de operaciones
+            # División visual
             rx.divider(),
+
+            # Título y listado del historial de operaciones
             rx.heading("Historial", size="3"),
             rx.foreach(Estado.historial, lambda item: rx.text(item)),
 
-            # Botón para limpiar
+            # Botón para limpiar inputs y resultados
             rx.button("Limpiar", color_scheme="red", on_click=Estado.limpiar),
 
             spacing="4",
         ),
         padding="4",
-        min_height="100vh"
+        min_height="100vh",
     )
 
-# 🚀 Arranque de la app
+# 🚀 Arranque de la app y registro de la página principal
 app = rx.App()
 app.add_page(index)
